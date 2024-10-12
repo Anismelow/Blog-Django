@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
+from django.urls import reverse
 # Create your models here.
 
 
@@ -31,7 +32,7 @@ class Post(models.Model):
     
     
     title = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=255 ) # el slug ayuda a crear url amigables con el seo 
+    slug = models.SlugField(max_length=255, unique_for_date='publish' ) # el slug ayuda a crear url amigables con el seo 
     body = models.TextField()
     
     publish = models.DateTimeField(default=timezone.now) # se pueden usar funciones generadas por las base de datos la cual seria haciendo esta importacion from django.db.model.functions  import Now y luego usando esta funcion "db_default=Now()""
@@ -52,6 +53,32 @@ class Post(models.Model):
     
     def __str__(self):
         return self.title
+    
+    def get_adsolute_url(self):
+        return reverse (
+            'blog:post_detail',
+            args=[
+                self.publish.year,
+                self.publish.month,
+                self.publish.day,
+                self.slug
+                  ]
+        )
+        
+        
+        
+        
+        
+        
+        
+        """
+                Esta función crea un url absoluto para este post.
+        Esto se utiliza para crear enlaces a los posts en el template.
+        La función reverse se utiliza para obtener la url de un nombre de vista y sus argumentos.
+        
+        """
+    
+    
     
     
         """
