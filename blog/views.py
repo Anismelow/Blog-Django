@@ -1,9 +1,10 @@
 from django.shortcuts import render,get_object_or_404
-from django.core.paginator import Paginator,EmptyPage,PageNotAnInteger
+from django.core.paginator import EmptyPage,PageNotAnInteger
 from django.views.generic import ListView
 from .models import Post
-from .form import EmailForm
-
+from .form import EmailForm, CommentForm
+from django.core.mail import send_mail
+from django.views.decorators.http import require_POST
 # Create your views here.
 
 
@@ -32,25 +33,80 @@ def post_detail(request, year, month, day, post):
         publish__day=day,
         slug=post,  
         )
-    return render(request, 'blog/post/detail.html', {'post': post})
-
+    comments = post.comments.filter(activate=True)
+    form = CommentForm()
+    return render(request, 'blog/post/detail.html', {'post': post, 'comments': comments, 'form': form})
 
 
 
 def post_share(request, post_id):
+    # Retrieve post by id
     post = get_object_or_404(
         Post,
         id=post_id,
-        status=Post.Status.PUBLISHED,
+        status=Post.Status.PUBLISHED
     )
+    sent = False
+
     if request.method == 'POST':
+        # Form was submitted
         form = EmailForm(request.POST)
         if form.is_valid():
+            # Form fields passed validation
             cd = form.cleaned_data
+            post_url = request.build_absolute_uri(
+                post.get_adsolute_url()
+            )
+            subject = (
+                f"{cd['name']} ({cd['email']}) "
+                f"recommends you read {post.title}"
+            )
+            message = (
+                f"Read {post.title} at {post_url}\n\n"
+                f"{cd['name']}'s comments: {cd['comments']}"
+            )
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=None,
+                recipient_list=[cd['to']],
+            )
+            sent = True
+
     else:
         form = EmailForm()
-    return render(request, 'blog/post/share.html', {'post': post, 'form': form})
-
+    return render(
+        request,
+        'blog/post/share.html',
+        {
+            'post': post,
+            'form': form,
+            'sent': sent
+        },
+    )
+    
+    
+def post_comments(request, post_id):
+    post = get_object_or_404(
+        Post,
+        id=post_id,
+        status=Post.Status.PUBLISHED
+    )
+    comment = None
+    form = CommentForm(data = request.POST)
+    if request.method == 'POST':
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.post = post
+            comment.save()
+    return render(
+        request,
+        'blog/post/comments.html',
+        {
+            'post': post,
+            'form': form,
+            'comment': comment
+        })
 
 
 class PostListView(ListView):
